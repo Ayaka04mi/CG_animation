@@ -37,25 +37,18 @@ public class Assignment1_66050026_66050306 extends JPanel implements ActionListe
     @Override
     public void actionPerformed(ActionEvent e) {
         waveOffset += 0.05;
+
         switch (sceneState) {
             case DAY:
-                sunAngle += 0.003; // ความเร็วพระอาทิตย์
-                if (sunAngle >= Math.PI) {
-                    sceneState = SceneState.NIGHT;
-                    nightStartTime = System.currentTimeMillis();
-                    moonAngle = 0;
-                }
+                sunAngle += 0.003;
                 break;
+
             case NIGHT:
-                moonAngle += 0.003; // ความเร็วพระจันทร์
-                if (moonAngle >= Math.PI) {
-                    sceneState = SceneState.DARK;
-                    nightStartTime = System.currentTimeMillis();
-                }
+                moonAngle += 0.003;
                 break;
 
             case DARK:
-
+                // ไม่ต้องทำอะไร
                 break;
         }
         repaint();
@@ -66,10 +59,11 @@ public class Assignment1_66050026_66050306 extends JPanel implements ActionListe
         setBackground(new Color(240, 240, 220));
         timer = new Timer(16, this); // ~60 FPS
         timer.start();
-        // สร้างดาวคงที่ (น้อยลง)
+
+        // === สร้างดาว (ใช้จุด pixel แทน fillOval) ===
         stars = new Point[20];
         Random rand = new Random();
-        int winX = 150, winY = 100, winW = 1000, winH = 400;
+        int winX = 50, winY = 100, winW = 500, winH = 260;
         for (int i = 0; i < stars.length; i++) {
             int x = winX + rand.nextInt(winW);
             int y = winY + rand.nextInt(winH);
@@ -77,132 +71,245 @@ public class Assignment1_66050026_66050306 extends JPanel implements ActionListe
         }
     }
 
+    @Override
     public void paintComponent(Graphics g) {
+        if (sceneState == SceneState.DARK) {
+            Graphics2D g2d = (Graphics2D) g;
+            g2d.setColor(Color.BLACK);
+            g2d.fillRect(0, 0, getWidth(), getHeight()); // พื้นดำเต็มจอ
+            g2d.dispose();
+            return; // ❗️ หยุดการวาดทั้งหมด
+        }
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         int winX = 50, winY = 100, winW = 500, winH = 260;
-        int radius = 300;
 
-        // กรอบหน้าต่าง
-        g2d.setColor(new Color(100, 60, 40));
-        g2d.setStroke(new BasicStroke(6));
-        g2d.drawRect(winX, winY, winW, winH);
+        // === กรอบหน้าต่างด้วย Bresenham ===
+        int padding = 6; // ระยะห่างระหว่างกรอบนอกกับกรอบใน
 
-        // เส้นแบ่ง
-        g2d.drawLine(winX + winW / 2, winY, winX + winW / 2, winY + winH);
-        g2d.drawLine(winX, winY + winH / 4, winX + winW, winY + winH / 4);
-        g2d.drawLine(winX + winW / 4, winY, winX + winW / 4,  winH - winY);
-        g2d.drawLine(winX + winW/2 + winW / 4, winY, winX + winW/2 + winW / 4,  winH - winY);
+        // === ตำแหน่งกรอบใน ===
+        int innerX = winX + padding;
+        int innerY = winY + padding;
+        int innerW = winW - 2 * padding;
+        int innerH = winH - 2 * padding;
 
-        if (sceneState == SceneState.DAY) {
-            // กลางวัน
-            g2d.setColor(new Color(180, 220, 255, 150));
-            g2d.fillRect(winX, winY, winW, winH);
+        int offset = 2; // ระยะห่างระหว่างเส้นคู่
+        // คำนวณตำแหน่งของเส้นแนวนอน 1/4 จากบน
+        int horizontalY1 = winY + winH / 4 - offset;
+        int horizontalY2 = winY + winH / 4 - offset;
 
-            int sunX = (int) (winX + winW / 2 + radius * Math.cos(sunAngle - Math.PI/ 2));
-            int sunY = (int) (winY + winH + radius * Math.sin(sunAngle - Math.PI / 2));
-            drawSunWithGlowClipped(g2d, winX, winY, winW, winH, sunX, sunY, 40);
+        // === วาดกระจก ===
+        drawGlass(g2d, winX + padding, winY + padding, innerW, innerH);
 
-        } else if (sceneState == SceneState.NIGHT) {
-            // กลางคืน
-            g2d.setColor(new Color(10, 10, 40, 200));
-            g2d.fillRect(winX, winY, winW, winH);
+        // === วาดพระอาทิตย์ ===
+        Shape oldClip = g2d.getClip(); // เก็บ clip เดิมไว้
 
-            // ดาวคงที่
-            g2d.setColor(Color.WHITE);
-            for (Point star : stars) {
-                g2d.fillOval(star.x, star.y, 2, 2);
+        // === กำหนด clip เป็นกรอบหน้าต่าง ===
+        g2d.setClip(new Rectangle(innerX, innerY, innerW, innerH));
+
+        // === วาดพระอาทิตย์ ===
+        if (sceneState == SceneState.DAY || sceneState == SceneState.TRANSITION) {
+            double progress = sunAngle; // 0.0 - 1.0
+            int amplitude = 60;
+
+            int sunX = innerX + (int) (progress * innerW);
+            int sunY = innerY + innerH / 2 - (int) (Math.sin(progress * Math.PI) * amplitude);
+
+            drawSun(g2d, sunX, sunY);
+
+            if (sunX > innerX + innerW) {
+                sceneState = SceneState.NIGHT;
+                nightStartTime = System.currentTimeMillis();
+                moonAngle = 0;
             }
 
-            int moonX = (int) (winX + winW / 2 + radius * Math.cos(moonAngle - Math.PI / 2));
-            int moonY = (int) (winY + winH + radius * Math.sin(moonAngle - Math.PI / 2));
-            drawMoonWithGlowClipped(g2d, winX, winY, winW, winH, moonX, moonY, 35);
+            // === วาดพระจันทร์ ===
+        } else if (sceneState == SceneState.NIGHT) {
+            Polygon nightGlass = new Polygon();
+            nightGlass.addPoint(innerX, innerY); // มุมบนซ้าย
+            nightGlass.addPoint(innerX + innerW, innerY); // มุมบนขวา
+            nightGlass.addPoint(innerX + innerW, innerY + innerH); // มุมล่างขวา
+            nightGlass.addPoint(innerX, innerY + innerH); // มุมล่างซ้าย
 
-        } else if (sceneState == SceneState.DARK) {
-            // พื้นหลังดำสนิท
-            g2d.setColor(Color.BLACK);
-            g2d.fillRect(0, 0, getWidth(), getHeight());
-        }
+            g2d.setColor(new Color(10, 10, 30)); // สีพื้นหลังกลางคืน
+            g2d.fillPolygon(nightGlass);
 
-        // วาดผ้าม่าน (ยกเว้นตอนมืดสนิท)
-        if (sceneState != SceneState.DARK) {
-            drawCurtain(g2d, winX, winY, winW, winH);
-        }
+            double progress = moonAngle;
+            int amplitude = 40;
 
-    }
+            int moonX = innerX + (int) (progress * innerW);
+            int moonY = innerY + innerH / 2 - (int) (Math.sin(progress * Math.PI) * amplitude);
 
-    private void drawCurtain(Graphics2D g2d, int winX, int winY, int winW, int winH) {
-        g2d.setColor(new Color(245, 245, 220, 200));
-        g2d.setStroke(new BasicStroke(2));
+            drawMoon(g2d, moonX, moonY);
 
-        int topY = winY - 20;
-        int bottomY = winY + winH + 50;
+            // วาดดาว
+            g2d.setColor(Color.WHITE);
+            for (Point star : stars) {
+                g2d.fillRect(star.x, star.y, 1, 1);
+            }
 
-        for (int i = 0; i <= 10; i++) {
-            double wave = Math.sin((i * 0.5) + waveOffset) * 20;
-            QuadCurve2D q = new QuadCurve2D.Double(
-                    winX + i * (winW / 10.0), topY,
-                    winX + i * (winW / 10.0) + wave, (topY + bottomY) / 2.0,
-                    winX + i * (winW / 10.0), bottomY);
-            g2d.draw(q);
-        }
-    }
+            if (moonX > innerX + innerW) {
+                sceneState = SceneState.DARK;
+            }
+        } 
 
-    private void drawSunWithGlowClipped(Graphics2D g2d, int winX, int winY, int winW, int winH, int xc, int yc, int r) {
-        BufferedImage glowImage = new BufferedImage(winW, winH, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D gGlow = glowImage.createGraphics();
-        gGlow.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        for (int i = 5; i >= 1; i--) {
-            int radius = r + i * 10;
-            int alpha = (int) (25 * i);
-            gGlow.setColor(new Color(255, 220, 120, Math.min(alpha, 255)));
-            gGlow.fillOval((xc - winX) - radius, (yc - winY) - radius, radius * 2, radius * 2);
-        }
-
-        gGlow.setColor(new Color(255, 204, 80));
-        drawMidpointCircleFilled(gGlow, (xc - winX), (yc - winY), r);
-
-        gGlow.setColor(new Color(255, 230, 120));
-        gGlow.fillOval((xc - winX) - (r - 4), (yc - winY) - (r - 4), (r - 4) * 2, (r - 4) * 2);
-
-        gGlow.dispose();
-        Shape oldClip = g2d.getClip();
-        g2d.setClip(new Rectangle(winX, winY, winW, winH));
-        g2d.drawImage(glowImage, winX, winY, null);
+        // === คืน clip เดิม ===
         g2d.setClip(oldClip);
+
+        // === กรอบนอก ===
+        g2d.setColor(new Color(150, 90, 60));
+        drawLineBresenham(g2d, winX, winY, winX + winW, winY); // บน
+        drawLineBresenham(g2d, winX, winY + winH, winX + winW, winY + winH); // ล่าง
+        drawLineBresenham(g2d, winX, winY, winX, winY + winH); // ซ้าย
+        drawLineBresenham(g2d, winX + winW, winY, winX + winW, winY + winH); // ขวา
+        // === กรอบใน ===
+        g2d.setColor(new Color(150, 90, 60));
+        drawLineBresenham(g2d, innerX, innerY, innerX + innerW, innerY); // บน
+        drawLineBresenham(g2d, innerX, innerY + innerH, innerX + innerW, innerY + innerH); // ล่าง
+        drawLineBresenham(g2d, innerX, innerY, innerX, innerY + innerH); // ซ้าย
+        drawLineBresenham(g2d, innerX + innerW, innerY, innerX + innerW, innerY + innerH); // ขวาF
+
+        // === เส้นแบ่งแนวตั้งตรงกลาง ===
+        drawLineBresenham(g2d, winX + winW / 2 - offset, winY + padding, winX + winW / 2 - offset,
+                winY + winH - padding);
+        drawLineBresenham(g2d, winX + winW / 2 + offset, winY + padding, winX + winW / 2 + offset,
+                winY + winH - padding);
+
+        // === เส้นแบ่งแนวนอน 1/4 จากบน ===
+        drawLineBresenham(g2d, winX + padding, winY + winH / 4 - offset, winX + winW - padding,
+                winY + winH / 4 - offset);
+        drawLineBresenham(g2d, winX + padding, winY + winH / 4 + offset, winX + winW - padding,
+                winY + winH / 4 + offset);
+
+        // === เส้นแบ่งแนวตั้ง 1/4 จากซ้าย (ถึงเส้นแนวนอน) ===
+        int verticalX1 = winX + winW / 4;
+        drawLineBresenham(g2d, verticalX1 - offset, winY + padding, verticalX1 - offset, horizontalY1);
+        drawLineBresenham(g2d, verticalX1 + offset, winY + padding, verticalX1 + offset, horizontalY2);
+
+        // === เส้นแบ่งแนวตั้ง 3/4 จากซ้าย (ถึงเส้นแนวนอน) ===
+        int verticalX3 = winX + 3 * winW / 4;
+        drawLineBresenham(g2d, verticalX3 - offset, winY + padding, verticalX3 - offset, horizontalY1);
+        drawLineBresenham(g2d, verticalX3 + offset, winY + padding, verticalX3 + offset, horizontalY2);
+
+        // === วาดผ้าม่าน ===
+        drawCurtain(g2d, winX, winY, winW, winH, waveOffset);
+
+        g2d.dispose();
+
     }
 
-    private void drawMoonWithGlowClipped(Graphics2D g2d, int winX, int winY, int winW, int winH, int xc, int yc, int r) {
-        BufferedImage glowImage = new BufferedImage(winW, winH, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D gGlow = glowImage.createGraphics();
-        gGlow.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+    // === Bresenham line ===
+    private void drawLineBresenham(Graphics2D g2d, int x0, int y0, int x1, int y1) {
+        int dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+        int sx = (x0 < x1) ? 1 : -1;
+        int sy = (y0 < y1) ? 1 : -1;
+        int err = dx - dy;
 
-        for (int i = 3; i >= 1; i--) {
-            int radius = r + i * 8;
-            int alpha = (int) (20 * i);
-            gGlow.setColor(new Color(200, 200, 200, Math.min(alpha, 255)));
-            gGlow.fillOval((xc - winX) - radius, (yc - winY) - radius, radius * 2, radius * 2);
+        while (true) {
+            g2d.fillRect(x0, y0, 1, 1);
+            if (x0 == x1 && y0 == y1)
+                break;
+            int e2 = 2 * err;
+            if (e2 > -dy) {
+                err -= dy;
+                x0 += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                y0 += sy;
+            }
         }
-
-        gGlow.setColor(new Color(230, 230, 230));
-        drawMidpointCircleFilled(gGlow, (xc - winX), (yc - winY), r);
-
-        gGlow.dispose();
-        Shape oldClip = g2d.getClip();
-        g2d.setClip(new Rectangle(winX, winY, winW, winH));
-        g2d.drawImage(glowImage, winX, winY, null);
-        g2d.setClip(oldClip);
     }
 
-    // Midpoint Circle Filled
-    private void drawMidpointCircleFilled(Graphics2D g, int xc, int yc, int r) {
-        for (int yy = -r; yy <= r; yy++) {
-            int rowY = yc + yy;
-            int xMax = (int) Math.floor(Math.sqrt(r * r - yy * yy));
-            g.fillRect(xc - xMax, rowY, xMax * 2 + 1, 1);
+    public void drawGlass(Graphics2D g2, int winX, int winY, int winW, int winH) {
+        // ตั้งค่าสีฟ้าโปร่งแสง
+        g2.setColor(new Color(135, 206, 250, 100)); // RGBA
+
+        // สร้าง Polygon เป็นสี่เหลี่ยมกระจก
+        Polygon glass = new Polygon();
+        glass.addPoint(winX, winY); // มุมบนซ้าย
+        glass.addPoint(winX + winW, winY); // มุมบนขวา
+        glass.addPoint(winX + winW, winY + winH); // มุมล่างขวา
+        glass.addPoint(winX, winY + winH); // มุมล่างซ้าย
+
+        // วาดกระจกด้วย Polygon
+        g2.fillPolygon(glass);
+    }
+
+    // === Midpoint Circle ===
+    private void drawFilledCircleMidpoint(Graphics2D g2d, int xc, int yc, int r, Color color) {
+        g2d.setColor(color);
+        for (int y = -r; y <= r; y++) {
+            for (int x = -r; x <= r; x++) {
+                if (x * x + y * y <= r * r) {
+                    g2d.fillRect(xc + x, yc + y, 1, 1);
+                }
+            }
+        }
+    }
+
+    // วาดพระอาทิตย์ 3 ชั้น (Glow Effect)
+    private void drawSun(Graphics2D g2d, int x, int y) {
+        drawFilledCircleMidpoint(g2d, x, y, 60, new Color(255, 230, 150)); // วงนอก
+        drawFilledCircleMidpoint(g2d, x, y, 50, new Color(255, 200, 100)); // วงกลาง
+        drawFilledCircleMidpoint(g2d, x, y, 40, new Color(255, 160, 0)); // วงใน
+    }
+
+    // วาดพระจันทร์ 3 ชั้น (Glow Effect)
+    private void drawMoon(Graphics2D g2d, int x, int y) {
+        drawFilledCircleMidpoint(g2d, x, y, 55, new Color(200, 200, 220)); // วงนอก
+        drawFilledCircleMidpoint(g2d, x, y, 45, new Color(180, 180, 200)); // วงกลาง
+        drawFilledCircleMidpoint(g2d, x, y, 35, new Color(240, 240, 255)); // วงใน
+    }
+
+    // ฟังก์ชันวาดเส้นตรงแนวนอน (pixel-by-pixel)
+    private void drawHorizontalLine(Graphics2D g2d, int x1, int x2, int y) {
+        for (int x = x1; x <= x2; x++) {
+            g2d.fillRect(x, y, 1, 1);
+        }
+    }
+
+    // วาดผ้าม่าน
+    public void drawCurtain(Graphics g, int winX, int winY, int winW, int winH, double waveOffset) {
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setColor(new Color(255, 255, 255, 180));
+
+        int curtainTop = winY + 10;
+        int curtainBottom = winY + winH + 20;
+        int amplitude = 10;
+        int frequency = 20;
+        int step = 10;
+
+        // for (int x = winX + 10; x < winX + winW - 10; x += step) {
+        // double offset = Math.sin((x / (double) frequency) + waveOffset) * amplitude;
+        // drawLineBresenham(g2, x + (int) offset, curtainTop, x + (int) offset,
+        // curtainBottom);
+        // }
+        for (int x = winX + 10; x < winX + winW - 10; x += step) {
+            double offset = Math.sin((x / (double) frequency) + waveOffset) * amplitude;
+            int baseX = x + (int) offset;
+
+            // วาดเส้นม่านแบบหนา (3 พิกเซล)
+            drawLineBresenham(g2, baseX - 1, curtainTop, baseX - 1, curtainBottom);
+            drawLineBresenham(g2, baseX, curtainTop, baseX, curtainBottom);
+            drawLineBresenham(g2, baseX + 1, curtainTop, baseX + 1, curtainBottom);
+        }
+    }
+
+    // === Bezier Curve ===
+    private void drawBezier(Graphics2D g2d, int[] px, int[] py) {
+        double step = 0.001;
+        for (double t = 0; t <= 1; t += step) {
+            double x = Math.pow(1 - t, 3) * px[0] +
+                    3 * t * Math.pow(1 - t, 2) * px[1] +
+                    3 * (1 - t) * t * t * px[2] +
+                    t * t * t * px[3];
+            double y = Math.pow(1 - t, 3) * py[0] +
+                    3 * t * Math.pow(1 - t, 2) * py[1] +
+                    3 * (1 - t) * t * t * py[2] +
+                    t * t * t * py[3];
+            g2d.fillRect((int) x, (int) y, 1, 1);
         }
     }
 
