@@ -1,403 +1,697 @@
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.geom.*;
 import javax.swing.*;
+import java.util.ArrayList;
+import java.util.List;
 
-public class Phoenix extends JPanel implements ActionListener {
-    private static int WIDTH = 600, HEIGHT = 600;
-    private final Timer timer;
+public class Phoenix1 extends JPanel implements ActionListener {
+    
+    private static final int WINDOW_WIDTH = 600;
+    private static final int WINDOW_HEIGHT = 600;
+    private static final int FRAME_RATE = 16; 
+    private final Timer animationTimer;
     private final long startTime;
-
-    public Phoenix() {
-        setPreferredSize(new Dimension(WIDTH, HEIGHT));
+    
+    public Phoenix1() {
+        setPreferredSize(new Dimension(WINDOW_WIDTH, WINDOW_HEIGHT));
         setBackground(Color.WHITE);
         startTime = System.currentTimeMillis();
-        timer = new Timer(16, this);
-        timer.start();
+        animationTimer = new Timer(FRAME_RATE, this);
+        animationTimer.start();
     }
-
+    
     @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        double t = (System.currentTimeMillis() - startTime) / 1000.0;
-        Graphics2D g2 = (Graphics2D) g;
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        drawScene4_ExplosionToSky(g2, t);
+    protected void paintComponent(Graphics graphics) {
+        super.paintComponent(graphics);
+        double elapsedTime = (System.currentTimeMillis() - startTime) / 1000.0;
+        Graphics2D g2d = (Graphics2D) graphics;
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, 
+                           RenderingHints.VALUE_ANTIALIAS_ON);
         
-        
+        drawAnimationSequence(g2d, elapsedTime);
     }
-
-    // Scene 4: White explosion flash → sky → phoenix flight
-    private void drawScene4_ExplosionToSky(Graphics2D g2, double dt) {
-        if (dt < 1.5) {
-            // ลูกบอลไฟลอยขึ้นมา
-            g2.setColor(new Color(30, 30, 50));
-            g2.fillRect(0, 0, WIDTH, HEIGHT);
-            drawFireballRising(g2, dt - 0.1);
-        } else if (dt < 2.0) {
-            // ระเบิดตู้ม
-            drawExplosion(g2, dt - 1.5);
-        } else if (dt < 2.5) {
-            // fade จากระเบิดเป็นท้องฟ้า
-            float p = (float)((dt - 2.0) / 1.0);
-            GradientPaint sky = new GradientPaint(0,0,new Color(80,180,255),
-                                                0,HEIGHT,new Color(200,240,255));
-            g2.setPaint(sky);
-            g2.fillRect(0,0,WIDTH,HEIGHT);
+    
+    /**
+     * Controls the main animation sequence
+     * Scene progression: Fireball → Explosion → Sky transition → Phoenix flight
+     */
+    private void drawAnimationSequence(Graphics2D g2d, double elapsedTime) {
+        if (elapsedTime < 1.5) {
+            // Scene 1: Dark sky with rising fireball
+            drawDarkSky(g2d);
+            drawRisingFireball(g2d, elapsedTime - 0.1);
             
-            // fade in ท้องฟ้า
-            g2.setColor(new Color(1f,1f,1f,1f-p));
-            g2.fillRect(0,0,WIDTH,HEIGHT);
+        } else if (elapsedTime < 2.0) {
+            // Scene 2: Explosion effect
+            drawExplosionEffect(g2d, elapsedTime - 1.5);
+            
+        } else if (elapsedTime < 2.5) {
+            // Scene 3: Transition to day sky
+            drawSkyTransition(g2d, elapsedTime - 2.0);
+            
         } else {
-            // ท้องฟ้าเต็มรูปแบบ + นกฟินิกซ์
-            GradientPaint sky = new GradientPaint(0,0,new Color(80,180,255),
-                                                0,HEIGHT,new Color(200,240,255));
-            g2.setPaint(sky);
-            g2.fillRect(0,0,WIDTH,HEIGHT);
-            drawPhoenix(g2, dt - 2.5);
+            // Scene 4: Phoenix flying in day sky
+            drawDaySky(g2d);
+            drawPhoenixFlight(g2d, elapsedTime - 2.5);
         }
     }
-
-    // เมธอดใหม่สำหรับลูกบอลไฟลอยขึ้น
-    private void drawFireballRising(Graphics2D g2, double dt) {
-        // ตำแหน่งลูกบอลไฟลอยขึ้น
-        int ballY = (int)(HEIGHT - dt * 250); // ลอยขึ้นจากล่างสู่บน
-        int ballX = WIDTH / 2;
-        double fireFlicker = Math.sin(dt * 15) * 3; // ไฟกระพริบ
+    
+    // ======= Algorithm Implementations =======
+    
+    /**
+     * Bresenham Line Algorithm - for drawing straight lines
+     * Used for: Sun rays, phoenix claws, feather rachis
+     */
+    private List<Point> calculateBresenhamLine(int startX, int startY, int endX, int endY) {
+        List<Point> linePoints = new ArrayList<>();
+        
+        int deltaX = Math.abs(endX - startX);
+        int deltaY = -Math.abs(endY - startY);
+        int stepX = startX < endX ? 1 : -1;
+        int stepY = startY < endY ? 1 : -1;
+        int error = deltaX + deltaY;
+        
+        int currentX = startX;
+        int currentY = startY;
+        
+        while (true) {
+            linePoints.add(new Point(currentX, currentY));
             
-            // ออร่าไฟรอบลูกบอล
-            for (int i = 3; i >= 1; i--) {
-                float alpha = 0.6f - (i * 0.15f);
-                int radius = 30 + i * 15 + (int)fireFlicker;
-                
-                RadialGradientPaint aura = new RadialGradientPaint(
-                    new Point2D.Float(ballX, ballY), radius,
-                    new float[]{0f, 0.7f, 1f},
-                    new Color[]{
-                        new Color(255, 80, 0, (int)(alpha * 255)),
-                        new Color(255, 150, 0, (int)(alpha * 200)),
-                        new Color(255, 220, 100, 0)
-                    }
-                );
-                g2.setPaint(aura);
-                g2.fillOval(ballX - radius, ballY - radius, radius * 2, radius * 2);
+            if (currentX == endX && currentY == endY) break;
+            
+            int doubleError = 2 * error;
+            if (doubleError >= deltaY) { 
+                error += deltaY; 
+                currentX += stepX; 
             }
-            
-            //ลูกบอลไฟหลัก
-            int ballRadius = 25 + (int)fireFlicker;
-            drawMidCircle(g2, ballX, ballY, ballRadius, new Color(255, 120, 0));
-            drawMidCircleOutline(g2, ballX, ballY, ballRadius);
-            
-            // ประกายไฟรอบลูกบอล
-            // for (int i = 0; i < 8; i++) {
-            //     double angle = (dt * 5 + i * Math.PI / 4) % (Math.PI * 2);
-            //     int sparkX = ballX + (int)(Math.cos(angle) * (40 + fireFlicker));
-            //     int sparkY = ballY + (int)(Math.sin(angle) * (40 + fireFlicker));
-            //     drawMidCircle(g2, sparkX, sparkY, 3, new Color(255, 200, 0, 180));
-            // }
-            
-            // หางไฟที่ตามหลัง
-            // Path2D trail = new Path2D.Double();
-            // trail.moveTo(ballX, ballY + ballRadius);
-            // trail.curveTo(ballX - 15, ballY + 60, ballX + 15, ballY + 80, ballX, ballY + 120);
-            // trail.curveTo(ballX - 8, ballY + 90, ballX + 8, ballY + 70, ballX, ballY + ballRadius);
-            // g2.setColor(new Color(255, 100, 0, 150));
-            // g2.fill(trail);
+            if (doubleError <= deltaX) { 
+                error += deltaX; 
+                currentY += stepY; 
+            }
         }
-
-    // เมธอดใหม่สำหรับระเบิด
-    private void drawExplosion(Graphics2D g2, double dt) {
-        // พื้นหลังมื
-        g2.setColor(new Color(30, 30, 50));
-        g2.fillRect(0, 0, WIDTH, HEIGHT);
+        
+        return linePoints;
+    }
+    
+    /**
+     * Midpoint Circle Algorithm - for drawing circles
+     * Used for: Phoenix head, eyes, explosion, fire aura
+     */
+    private Polygon createMidpointCircle(int centerX, int centerY, int radius) {
+        Polygon circlePolygon = new Polygon();
+        List<Point> circlePoints = new ArrayList<>();
+        
+        int x = radius;
+        int y = 0;
+        int decisionParameter = 1 - radius;
+        
+        while (x >= y) {
+            // Plot all 8 octants of the circle
+            circlePoints.add(new Point(centerX + x, centerY + y));
+            circlePoints.add(new Point(centerX + y, centerY + x));
+            circlePoints.add(new Point(centerX - y, centerY + x));
+            circlePoints.add(new Point(centerX - x, centerY + y));
+            circlePoints.add(new Point(centerX - x, centerY - y));
+            circlePoints.add(new Point(centerX - y, centerY - x));
+            circlePoints.add(new Point(centerX + y, centerY - x));
+            circlePoints.add(new Point(centerX + x, centerY - y));
             
-        int explodeX = WIDTH / 2;
-        int explodeY = (int)(HEIGHT - 1.9 * 200); // ตำแหน่งที่ลูกบอลหยุด
+            if (decisionParameter < 0) {
+                decisionParameter += 2 * y + 3;
+            } else {
+                decisionParameter += 2 * (y - x) + 5;
+                x--;
+            }
+            y++;
+        }
+        
+        // Sort points by angle to create proper polygon
+        circlePoints.sort((point1, point2) -> {
+            double angle1 = Math.atan2(point1.y - centerY, point1.x - centerX);
+            double angle2 = Math.atan2(point2.y - centerY, point2.x - centerX);
+            return Double.compare(angle1, angle2);
+        });
+        
+        for (Point point : circlePoints) {
+            circlePolygon.addPoint(point.x, point.y);
+        }
+        
+        return circlePolygon;
+    }
+    
+    /**
+     * Midpoint Ellipse Algorithm - for drawing ellipses
+     * Used for: Phoenix body, clouds, neck
+     */
+    private Polygon createMidpointEllipse(int centerX, int centerY, int radiusA, int radiusB) {
+        Polygon ellipsePolygon = new Polygon();
+        List<Point> ellipsePoints = new ArrayList<>();
+        
+        int aSquared = radiusA * radiusA;
+        int bSquared = radiusB * radiusB;
+        int twoASquared = 2 * aSquared;
+        int twoBSquared = 2 * bSquared;
+        
+        // Region 1: Where slope > -1
+        int x = 0;
+        int y = radiusB;
+        int decisionParam1 = Math.round(bSquared - aSquared * radiusB + aSquared / 4);
+        int deltaX = 0;
+        int deltaY = twoASquared * y;
+        
+        while (deltaX <= deltaY) {
+            // Plot 4 quadrants
+            ellipsePoints.add(new Point(centerX + x, centerY + y));
+            ellipsePoints.add(new Point(centerX - x, centerY + y));
+            ellipsePoints.add(new Point(centerX + x, centerY - y));
+            ellipsePoints.add(new Point(centerX - x, centerY - y));
             
-        // คลื่นระเบิดขยายออก
-        double explosionRadius = dt * 400; // ขยายเร็ว
-        double intensity = 1.0 - dt * 2; // ลดความเข้มลง
+            x++;
+            deltaX += twoBSquared;
+            decisionParam1 += deltaX + bSquared;
             
+            if (decisionParam1 >= 0) {
+                y--;
+                deltaY -= twoASquared;
+                decisionParam1 -= deltaY;
+            }
+        }
+        
+        // Region 2: Where slope < -1
+        x = radiusA;
+        y = 0;
+        int decisionParam2 = Math.round(aSquared - bSquared * radiusA + bSquared / 4);
+        deltaX = twoBSquared * x;
+        deltaY = 0;
+        
+        while (deltaX >= deltaY) {
+            // Plot 4 quadrants
+            ellipsePoints.add(new Point(centerX + x, centerY + y));
+            ellipsePoints.add(new Point(centerX - x, centerY + y));
+            ellipsePoints.add(new Point(centerX + x, centerY - y));
+            ellipsePoints.add(new Point(centerX - x, centerY - y));
+            
+            y++;
+            deltaY += twoASquared;
+            decisionParam2 += deltaY + aSquared;
+            
+            if (decisionParam2 >= 0) {
+                x--;
+                deltaX -= twoBSquared;
+                decisionParam2 -= deltaX;
+            }
+        }
+        
+        // Sort points by angle and create polygon
+        ellipsePoints.sort((point1, point2) -> {
+            double angle1 = Math.atan2(point1.y - centerY, point1.x - centerX);
+            double angle2 = Math.atan2(point2.y - centerY, point2.x - centerX);
+            return Double.compare(angle1, angle2);
+        });
+        
+        for (Point point : ellipsePoints) {
+            ellipsePolygon.addPoint(point.x, point.y);
+        }
+        
+        return ellipsePolygon;
+    }
+    
+    /**
+     * Bezier Curve Algorithm - for drawing curved lines
+     * Used for: Phoenix wing feathers
+     */
+    private Polygon createBezierCurve(int x0, int y0, int x1, int y1, 
+                                     int x2, int y2, int x3, int y3, int segments) {
+        Polygon curvePolygon = new Polygon();
+        
+        for (int i = 0; i <= segments; i++) {
+            double t = i / (double) segments;
+            double tSquared = t * t;
+            double tCubed = tSquared * t;
+            double oneMinusT = 1 - t;
+            double oneMinusTSquared = oneMinusT * oneMinusT;
+            double oneMinusTCubed = oneMinusTSquared * oneMinusT;
+            
+            int x = (int)(oneMinusTCubed * x0 + 3 * oneMinusTSquared * t * x1 + 
+                         3 * oneMinusT * tSquared * x2 + tCubed * x3);
+            int y = (int)(oneMinusTCubed * y0 + 3 * oneMinusTSquared * t * y1 + 
+                         3 * oneMinusT * tSquared * y2 + tCubed * y3);
+            
+            curvePolygon.addPoint(x, y);
+        }
+        
+        return curvePolygon;
+    }
+    
+    /**
+     * Utility method to draw lines using Bresenham algorithm
+     */
+    private void drawBresenhamLine(Graphics2D g2d, int startX, int startY, int endX, int endY) {
+        List<Point> linePoints = calculateBresenhamLine(startX, startY, endX, endY);
+        for (Point point : linePoints) {
+            g2d.fillRect(point.x, point.y, 1, 1);
+        }
+    }
+    
+    // ======= Scene Drawing Methods =======
+    
+    //Draws dark night sky background 
+    private void drawDarkSky(Graphics2D g2d) {
+        g2d.setColor(new Color(30, 30, 50));
+        g2d.fillRect(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+    }
+    
+    
+    //Draws day sky with gradient
+    private void drawDaySky(Graphics2D g2d) {
+        GradientPaint skyGradient = new GradientPaint(
+            0, 0, new Color(80, 180, 255),
+            0, WINDOW_HEIGHT, new Color(200, 240, 255)
+        );
+        g2d.setPaint(skyGradient);
+        g2d.fillRect(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+    }
+    
+    //Draws rising fireball animation
+    private void drawRisingFireball(Graphics2D g2d, double elapsedTime) {
+        int fireballY = (int)(WINDOW_HEIGHT - elapsedTime * 250);
+        int fireballX = WINDOW_WIDTH / 2;
+        double fireFlicker = Math.sin(elapsedTime * 15) * 3;
+        
+        // Draw fire aura with multiple circle layers
+        for (int layer = 3; layer >= 1; layer--) {
+            float transparency = 0.6f - (layer * 0.15f);
+            int auraRadius = 30 + layer * 15 + (int)fireFlicker;
+            g2d.setColor(new Color(255, 150, 0, (int)(transparency * 200)));
+            g2d.fillPolygon(createMidpointCircle(fireballX, fireballY, auraRadius));
+        }
+        
+        // Draw main fireball
+        int fireballRadius = 25 + (int)fireFlicker;
+        g2d.setColor(new Color(255, 120, 0));
+        g2d.fillPolygon(createMidpointCircle(fireballX, fireballY, fireballRadius));
+        g2d.setColor(Color.WHITE);
+        g2d.drawPolygon(createMidpointCircle(fireballX, fireballY, fireballRadius));
+    }
+    
+    //Draws explosion effect
+    private void drawExplosionEffect(Graphics2D g2d, double elapsedTime) {
+        drawDarkSky(g2d);
+        
+        int explosionX = WINDOW_WIDTH / 2;
+        int explosionY = (int)(WINDOW_HEIGHT - 1.9 * 200);
+        double explosionRadius = elapsedTime * 400;
+        double intensity = 1.0 - elapsedTime * 2;
+        
         if (intensity > 0) {
-            // แสงระเบิด
-            RadialGradientPaint explosion = new RadialGradientPaint(
-                new Point2D.Float(explodeX, explodeY), (float)explosionRadius,
-                new float[]{0f, 0.3f, 0.6f, 1f},
-                new Color[]{
-                    new Color(255, 255, 255, (int)(intensity * 255)),
-                    new Color(255, 200, 0, (int)(intensity * 200)),
-                    new Color(255, 100, 0, (int)(intensity * 100)),
-                    new Color(255, 50, 0, 0)
-                    }
-                );
-            g2.setPaint(explosion);
-            g2.fillOval((int)(explodeX - explosionRadius), (int)(explodeY - explosionRadius),
-                    (int)(explosionRadius * 2), (int)(explosionRadius * 2));
-                
-            // ประกายไฟกระจาย
+            // Main explosion circle
+            g2d.setColor(new Color(255, 255, 255, (int)(intensity * 255)));
+            g2d.fillPolygon(createMidpointCircle(explosionX, explosionY, (int)explosionRadius));
+            
+            // Surrounding fire sparks
             for (int i = 0; i < 20; i++) {
-                double angle = i * Math.PI * 2 / 20;
-                double sparkDist = explosionRadius * 0.8;
-                int sparkX = explodeX + (int)(Math.cos(angle) * sparkDist);
-                int sparkY = explodeY + (int)(Math.sin(angle) * sparkDist);
-                    
-                if (sparkX >= 0 && sparkX < WIDTH && sparkY >= 0 && sparkY < HEIGHT) {
-                    drawMidCircle(g2, sparkX, sparkY, (int)(intensity * 8), 
-                                new Color(255, 150, 0, (int)(intensity * 200)));
+                double sparkAngle = i * Math.PI * 2 / 20;
+                double sparkDistance = explosionRadius * 0.8;
+                int sparkX = explosionX + (int)(Math.cos(sparkAngle) * sparkDistance);
+                int sparkY = explosionY + (int)(Math.sin(sparkAngle) * sparkDistance);
+                
+                if (sparkX >= 0 && sparkX < WINDOW_WIDTH && 
+                    sparkY >= 0 && sparkY < WINDOW_HEIGHT) {
+                    g2d.setColor(new Color(255, 150, 0, (int)(intensity * 200)));
+                    g2d.fillPolygon(createMidpointCircle(sparkX, sparkY, (int)(intensity * 8)));
                 }
             }
         }
     }
-
-    private void drawPhoenix(Graphics2D g2, double dt) {
-        // คำนวณตำแหน่งบินรูป infinity (∞)
-        double t = dt * 1.5;
-        double a = 150;
-        int cx = (int)(a * Math.sin(t) / (1 + Math.cos(t) * Math.cos(t)) + WIDTH/2);
-        int cy = (int)(a * Math.sin(t) * Math.cos(t) / (1 + Math.cos(t) * Math.cos(t)) + HEIGHT/2);
+    
+    //Draws transition from explosion to day sky
+    private void drawSkyTransition(Graphics2D g2d, double transitionProgress) {
+        float fadeProgress = (float)(transitionProgress / 1.0);
         
-        double flap = 20 * Math.sin(dt * 6);
-        double fireEffect = Math.sin(dt * 8) * 5;
-
-        // วาดการตกแต่งท้องฟ้า
-        drawSkyDecorations(g2, dt);
+        drawDaySky(g2d);
         
-        g2.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-
-        // วาดออร่าไฟรอบตัวนก (สีแดง-ส้ม-เหลือง)
-        for (int i = 3; i >= 1; i--) {
-            float alpha = 0.4f - (i * 0.1f);
-            int radius = 50 + i * 20 + (int)fireEffect;
-            
-            RadialGradientPaint aura = new RadialGradientPaint(
-                new Point2D.Float(cx, cy - 30), radius,
-                new float[]{0f, 0.6f, 1f},
-                new Color[]{
-                    new Color(255, 50, 0, (int)(alpha * 255)),   // แดงเข้ม
-                    new Color(255, 120, 0, (int)(alpha * 200)),  // ส้ม  
-                    new Color(255, 200, 100, 0)                  // เหลืองอ่อน
-                }
-            );
-            g2.setPaint(aura);
-            g2.fillOval(cx - radius, cy - 30 - radius, radius * 2, radius * 2);
-        }
-
-        // ประกายไฟรอบตัว (สีแดง-ส้ม)
-        for (int i = 0; i < 12; i++) {
-            double angle = (dt * 3 + i * Math.PI / 6) % (Math.PI * 2);
-            int sparkX = cx + (int)(Math.cos(angle) * (60 + fireEffect));
-            int sparkY = cy - 30 + (int)(Math.sin(angle) * (40 + fireEffect));
-            
-            // สลับสีประกาย
-            Color sparkColor = (i % 2 == 0) ? 
-                new Color(255, 80, 0, 220) :    // แดงส้ม
-                new Color(255, 150, 0, 200);    // ส้มทอง
-            
-            drawMidCircle(g2, sparkX, sparkY, 4 + (int)(fireEffect/2), sparkColor);
-        }
-
-            // หางไฟ (สีแดงไล่ส้ม)
-            Path2D flameTail = new Path2D.Double();
-            flameTail.moveTo(cx, cy + 10);
-            flameTail.curveTo(cx - 25, cy + 35 + fireEffect, cx + 25, cy + 50 + fireEffect, cx, cy + 80 + fireEffect);
-            flameTail.curveTo(cx - 15, cy + 55 + fireEffect, cx + 15, cy + 30 + fireEffect, cx, cy + 10);
-            
-            // ไล่สีหางไฟ
-            GradientPaint flameGrad = new GradientPaint(
-                cx, cy + 10, new Color(255, 200, 50),    // ทองที่โคนหาง
-                cx, cy + 80 + (int)fireEffect, new Color(255, 50, 0)  // แดงที่ปลายหาง
-            );
-            g2.setPaint(flameGrad);
-            g2.fill(flameTail);
-            g2.setColor(new Color(200, 50, 0));
-            g2.setStroke(new BasicStroke(2f));
-            g2.draw(flameTail);
-
-            // ลำตัวหลัก (สีทองเข้ม)
-            Path2D body = new Path2D.Double();
-            body.moveTo(cx, cy);
-            body.curveTo(cx - 25, cy - 60, cx + 25, cy - 60, cx, cy);
-            g2.setColor(new Color(200, 120, 30));  // ทองเข้มคล้ายในรูป
-            g2.fill(body);
-            g2.setColor(new Color(150, 80, 0));    // ขอบทองเข้มกว่า
-            g2.setStroke(new BasicStroke(3f));
-            g2.draw(body);
-
-            // หัว (สีทองเข้ม)
-            int hx = cx;
-            int hy = cy - 60;
-            drawMidCircle(g2, hx, hy, 15, new Color(200, 120, 30));
-            g2.setColor(new Color(150, 80, 0));
-            drawMidCircleOutline(g2, hx, hy, 15);
-
-            // ตาเรืองแสง (สีแดง-ส้ม)
-            g2.setColor(new Color(255, 100, 0));
-            g2.fillOval(hx - 8, hy - 10, 12, 12);
-            g2.setColor(new Color(200, 50, 0));
-            g2.fillOval(hx - 6, hy - 8, 6, 6);
-            g2.setColor(new Color(255, 200, 100));
-            g2.fillOval(hx - 4, hy - 6, 3, 3);
-
-            // จมูก/ปาก (สีส้มเข้ม)
-            Path2D beak = new Path2D.Double();
-            beak.moveTo(hx + 12, hy + 2);
-            beak.lineTo(hx + 20, hy + 5);
-            beak.lineTo(hx + 12, hy + 8);
-            beak.closePath();
-            g2.setColor(new Color(220, 100, 0));
-            g2.fill(beak);
-            g2.setColor(new Color(180, 60, 0));
-            g2.draw(beak);
-
-            // ปีกซ้าย พร้อมเอฟเฟกต์ไฟ (สีแดง-ทอง)
-            Path2D leftWing = new Path2D.Double();
-            leftWing.moveTo(cx - 10, cy - 10);
-            leftWing.curveTo(cx - 100, cy - 80 + flap, cx - 140, cy - 30 + flap, cx - 80, cy + 10);
-            leftWing.curveTo(cx - 110, cy - 20 + flap, cx - 90, cy + 30 + flap, cx - 60, cy + 10);
-            leftWing.curveTo(cx - 90, cy, cx - 50, cy + 40, cx - 20, cy + 10);
-            
-            // ไฟตามขอบปีก (สีแดงส้ม)
-            g2.setColor(new Color(255, 80, 0, 120));
-            g2.setStroke(new BasicStroke(10f));
-            g2.draw(leftWing);
-            
-            // ไล่สีปีก
-            GradientPaint wingGrad = new GradientPaint(
-                cx - 10, cy - 80 + (int)flap, new Color(255, 150, 50),  // ทองที่โคนปีก
-                cx - 140, cy - 30 + (int)flap, new Color(200, 50, 0)    // แดงที่ปลายปีก
-            );
-            g2.setPaint(wingGrad);
-            g2.fill(leftWing);
-            g2.setColor(new Color(150, 40, 0));
-            g2.setStroke(new BasicStroke(3f));
-            g2.draw(leftWing);
-
-            // ปีกขวา พร้อมเอฟเฟกต์ไฟ (สีแดง-ทอง)
-            Path2D rightWing = new Path2D.Double();
-            rightWing.moveTo(cx + 10, cy - 10);
-            rightWing.curveTo(cx + 100, cy - 80 + flap, cx + 140, cy - 30 + flap, cx + 80, cy + 10);
-            rightWing.curveTo(cx + 110, cy - 20 + flap, cx + 90, cy + 30 + flap, cx + 60, cy + 10);
-            rightWing.curveTo(cx + 90, cy, cx + 50, cy + 40, cx + 20, cy + 10);
-            
-            // ไฟตามขอบปีก
-            g2.setColor(new Color(255, 80, 0, 120));
-            g2.setStroke(new BasicStroke(10f));
-            g2.draw(rightWing);
-            
-            // ไล่สีปีก
-            GradientPaint wingGradR = new GradientPaint(
-                cx + 10, cy - 80 + (int)flap, new Color(255, 150, 50),
-                cx + 140, cy - 30 + (int)flap, new Color(200, 50, 0)
-            );
-            g2.setPaint(wingGradR);
-            g2.fill(rightWing);
-            g2.setColor(new Color(150, 40, 0));
-            g2.setStroke(new BasicStroke(3f));
-            g2.draw(rightWing);
+        // White fade overlay
+        g2d.setColor(new Color(1f, 1f, 1f, 1f - fadeProgress));
+        g2d.fillRect(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
     }
-
-    // เพิ่มเมธอดใหม่สำหรับตกแต่งท้องฟ้า
-    private void drawSkyDecorations(Graphics2D g2, double dt) {
-        // เมฆลอยช้า ๆ
-        g2.setColor(new Color(255, 255, 255, 150));
-        for (int i = 0; i < 4; i++) {
-            int cloudX = (int)((i * 150 + dt * 20) % (WIDTH + 100)) - 50;
-            int cloudY = 80 + i * 30;
-            drawCloud(g2, cloudX, cloudY);
+    
+    
+    //Main phoenix drawing method with infinity flight pattern
+    private void drawPhoenixFlight(Graphics2D g2d, double elapsedTime) {
+        // Calculate infinity (∞) flight pattern
+        double flightParameter = elapsedTime * 1.5;
+        double amplitude = 150;
+        
+        int phoenixX = (int)(amplitude * Math.sin(flightParameter) / 
+                           (1 + Math.cos(flightParameter) * Math.cos(flightParameter)) + 
+                           WINDOW_WIDTH / 2);
+        int phoenixY = (int)(amplitude * Math.sin(flightParameter) * Math.cos(flightParameter) / 
+                           (1 + Math.cos(flightParameter) * Math.cos(flightParameter)) + 
+                           WINDOW_HEIGHT / 2);
+        
+        double wingFlap = 25 * Math.sin(elapsedTime * 6);
+        double fireEffect = Math.sin(elapsedTime * 8) * 5;
+        
+        drawSkyDecorations(g2d, elapsedTime);
+        drawPhoenixFireAura(g2d, phoenixX, phoenixY, fireEffect);
+        drawPhoenixTail(g2d, phoenixX, phoenixY, fireEffect);
+        drawPhoenixWings(g2d, phoenixX, phoenixY, wingFlap, fireEffect);
+        drawPhoenixBody(g2d, phoenixX, phoenixY);
+        drawPhoenixHead(g2d, phoenixX, phoenixY);
+        drawPhoenixClaws(g2d, phoenixX, phoenixY);
+        drawPhoenixFireSparks(g2d, phoenixX, phoenixY, elapsedTime, fireEffect);
+    }
+    
+    //Draws phoenix fire aura effect
+    private void drawPhoenixFireAura(Graphics2D g2d, int phoenixX, int phoenixY, double fireEffect) {
+        for (int layer = 3; layer >= 1; layer--) {
+            float transparency = 0.15f - (layer * 0.03f);
+            int auraRadius = 45 + layer * 15 + (int)fireEffect;
+            g2d.setColor(new Color(255, 100, 0, (int)(transparency * 255)));
+            g2d.fillPolygon(createMidpointCircle(phoenixX, phoenixY - 15, auraRadius));
+        }
+    }
+    
+    //Draws peacock-style phoenix tail with individual feathers
+    private void drawPhoenixTail(Graphics2D g2d, int phoenixX, int phoenixY, double fireEffect) {
+        for (int featherIndex = 0; featherIndex < 5; featherIndex++) {
+            double tailAngle = (Math.PI / 8) * (featherIndex - 2);
+            int tailTipX = phoenixX + (int)(Math.sin(tailAngle) * 30);
+            int tailTipY = phoenixY + 90 + (int)fireEffect + featherIndex * 8;
+            
+            // Individual tail feather
+            g2d.setColor(new Color(200, 30, 0, 220));
+            Polygon tailFeather = new Polygon();
+            tailFeather.addPoint(phoenixX, phoenixY + 15);
+            tailFeather.addPoint(phoenixX + (int)(Math.sin(tailAngle) * 10), phoenixY + 40);
+            tailFeather.addPoint(tailTipX, tailTipY);
+            tailFeather.addPoint(phoenixX + (int)(Math.sin(tailAngle) * 8), phoenixY + 35);
+            g2d.fillPolygon(tailFeather);
+            
+            // Feather border
+            g2d.setColor(new Color(120, 15, 0));
+            g2d.drawPolygon(tailFeather);
+        }
+    }
+    
+    //Draws multi-layered phoenix wings using Bezier curves
+    private void drawPhoenixWings(Graphics2D g2d, int phoenixX, int phoenixY, 
+                                 double wingFlap, double fireEffect) {
+        drawDetailedWing(g2d, phoenixX, phoenixY, wingFlap, fireEffect, true);  // Left wing
+        drawDetailedWing(g2d, phoenixX, phoenixY, wingFlap, fireEffect, false); // Right wing
+    }
+    
+    //Draws individual wing with multiple feather layers
+    private void drawDetailedWing(Graphics2D g2d, int phoenixX, int phoenixY, 
+                                 double wingFlap, double fireEffect, boolean isLeftWing) {
+        int direction = isLeftWing ? -1 : 1;
+        int wingBaseX = phoenixX + (direction * 5);
+        int wingBaseY = phoenixY - 18;
+        
+        // Primary feathers (outer layer)
+        drawFeatherLayer(g2d, wingBaseX, wingBaseY, direction, wingFlap,
+                        new int[]{120, 115, 110, 105, 100, 95},
+                        new double[]{-45, -35, -25, -15, -5, 5},
+                        new Color(180, 30, 0, 220), 0);
+        
+        // Secondary feathers (middle layer)
+        drawFeatherLayer(g2d, wingBaseX, wingBaseY + 5, direction, wingFlap,
+                        new int[]{100, 95, 90, 85, 80},
+                        new double[]{-40, -28, -16, -4, 8},
+                        new Color(255, 80, 20, 230), 1);
+        
+        // Tertiary feathers (inner layer)
+        drawFeatherLayer(g2d, wingBaseX, wingBaseY + 10, direction, wingFlap,
+                        new int[]{80, 75, 70, 65},
+                        new double[]{-35, -20, -5, 10},
+                        new Color(255, 160, 50, 240), 2);
+        
+        // Cover feathers (innermost layer)
+        drawFeatherLayer(g2d, wingBaseX, wingBaseY + 15, direction, wingFlap,
+                        new int[]{50, 45, 40},
+                        new double[]{-25, -10, 5},
+                        new Color(255, 200, 80, 250), 3);
+    }
+    
+    
+    //Draws a layer of wing feathers using Bezier curves
+    private void drawFeatherLayer(Graphics2D g2d, int baseX, int baseY, int direction, 
+                                 double wingFlap, int[] featherLengths, double[] featherAngles,
+                                 Color featherColor, int layerIndex) {
+        for (int i = 0; i < featherLengths.length; i++) {
+            double angleRadians = Math.toRadians(featherAngles[i]);
+            double currentFlap = wingFlap * (1.0 - layerIndex * 0.1 + i * 0.04);
+            
+            int featherTipX = baseX + (int)(direction * featherLengths[i] * Math.cos(angleRadians));
+            int featherTipY = baseY - (int)(featherLengths[i] * Math.sin(angleRadians) + currentFlap);
+            
+            // Create feather using Bezier curve
+            Polygon featherShape = createBezierCurve(
+                baseX - direction * (5 - layerIndex), baseY,              // P0: Base left
+                baseX + direction * (40 - layerIndex * 10), baseY - 20,   // P1: Control point 1
+                featherTipX - direction * (15 - layerIndex * 3), featherTipY + 10, // P2: Control point 2
+                featherTipX, featherTipY,                                 // P3: Tip
+                25 - layerIndex * 5                                       // Segments
+            );
+            
+            // Draw feather
+            g2d.setColor(featherColor);
+            g2d.fillPolygon(featherShape);
+            g2d.setColor(new Color(100, 15, 0));
+            g2d.drawPolygon(featherShape);
+            
+            // Draw feather rachis (center line)
+            g2d.setColor(new Color(80, 10, 0));
+            drawBresenhamLine(g2d, baseX, baseY, featherTipX, featherTipY);
+        }
+    }
+    
+    //Draws phoenix body using midpoint ellipse
+    private void drawPhoenixBody(Graphics2D g2d, int phoenixX, int phoenixY) {
+        // Outer body layer
+        g2d.setColor(new Color(180, 100, 20));
+        Polygon outerBody = createMidpointEllipse(phoenixX, phoenixY - 15, 17, 42);
+        g2d.fillPolygon(outerBody);
+        
+        // Middle body layer
+        g2d.setColor(new Color(220, 140, 40));
+        Polygon middleBody = createMidpointEllipse(phoenixX, phoenixY - 15, 14, 35);
+        g2d.fillPolygon(middleBody);
+        
+        // Inner body layer
+        g2d.setColor(new Color(200, 120, 30));
+        Polygon innerBody = createMidpointEllipse(phoenixX, phoenixY - 15, 10, 27);
+        g2d.fillPolygon(innerBody);
+        
+        // Body outline
+        g2d.setColor(new Color(120, 60, 0));
+        g2d.drawPolygon(outerBody);
+    }
+    
+    //Draws phoenix head, neck, eyes, and beak
+    private void drawPhoenixHead(Graphics2D g2d, int phoenixX, int phoenixY) {
+        int headX = phoenixX;
+        int headY = phoenixY - 45;
+        
+        // Neck
+        g2d.setColor(new Color(200, 120, 30));
+        g2d.fillPolygon(createMidpointCircle(phoenixX, phoenixY - 30, 10));
+        
+        // Head layers
+        g2d.setColor(new Color(180, 100, 20));
+        g2d.fillPolygon(createMidpointCircle(headX, headY, 16));
+        g2d.setColor(new Color(220, 140, 40));
+        g2d.fillPolygon(createMidpointCircle(headX, headY, 13));
+        g2d.setColor(new Color(120, 60, 0));
+        g2d.drawPolygon(createMidpointCircle(headX, headY, 16));
+        
+        // Eye layers (black eyes as requested)
+        g2d.setColor(new Color(255, 255, 255));
+        g2d.fillPolygon(createMidpointCircle(headX - 3, headY - 5, 6));
+        g2d.setColor(new Color(20, 20, 20));
+        g2d.fillPolygon(createMidpointCircle(headX - 3, headY - 5, 5));
+        g2d.setColor(new Color(0, 0, 0));
+        g2d.fillPolygon(createMidpointCircle(headX - 3, headY - 5, 3));
+        g2d.setColor(new Color(255, 255, 255));
+        g2d.fillPolygon(createMidpointCircle(headX - 5, headY - 7, 1));
+        
+        // Golden beak
+        drawGoldenBeak(g2d, headX, headY);
+    }
+    
+    
+    //Draws eagle-style golden beak
+    private void drawGoldenBeak(Graphics2D g2d, int headX, int headY) {
+        // Upper beak
+        Polygon upperBeak = new Polygon();
+        upperBeak.addPoint(headX + 13, headY);
+        upperBeak.addPoint(headX + 22, headY + 2);
+        upperBeak.addPoint(headX + 20, headY + 6);
+        upperBeak.addPoint(headX + 15, headY + 3);
+        g2d.setColor(new Color(255, 215, 0));
+        g2d.fillPolygon(upperBeak);
+        
+        // Lower beak
+        Polygon lowerBeak = new Polygon();
+        lowerBeak.addPoint(headX + 13, headY + 3);
+        lowerBeak.addPoint(headX + 19, headY + 6);
+        lowerBeak.addPoint(headX + 17, headY + 8);
+        g2d.setColor(new Color(200, 170, 0));
+        g2d.fillPolygon(lowerBeak);
+        
+        // Beak outlines
+        g2d.setColor(new Color(150, 120, 0));
+        g2d.drawPolygon(upperBeak);
+        g2d.drawPolygon(lowerBeak);
+    }
+    
+    //Draws phoenix claws (golden talons)
+    private void drawPhoenixClaws(Graphics2D g2d, int phoenixX, int phoenixY) {
+        g2d.setColor(new Color(255, 215, 0));
+        
+        // Left leg and talons
+        drawBresenhamLine(g2d, phoenixX - 6, phoenixY + 8, phoenixX - 8, phoenixY + 25);
+        for (int talon = 0; talon < 3; talon++) {
+            drawBresenhamLine(g2d, phoenixX - 8 + talon * 1, phoenixY + 25, 
+                            phoenixX - 10 + talon * 2, phoenixY + 30);
         }
         
-        // ดาวเล็ก ๆ กระพริบ
-        for (int i = 0; i < 8; i++) {
-            double twinkle = Math.sin(dt * 4 + i) * 0.5 + 0.5;
-            int starX = 50 + i * 70;
-            int starY = 50 + (int)(Math.sin(dt + i) * 20);
-            g2.setColor(new Color(255, 255, 200, (int)(twinkle * 180)));
-            drawStar(g2, starX, starY, 10);
+        // Right leg and talons
+        drawBresenhamLine(g2d, phoenixX + 6, phoenixY + 8, phoenixX + 8, phoenixY + 25);
+        for (int talon = 0; talon < 3; talon++) {
+            drawBresenhamLine(g2d, phoenixX + 8 - talon * 1, phoenixY + 25, 
+                            phoenixX + 10 - talon * 2, phoenixY + 30);
+        }
+    }
+    
+    
+    //Draws rotating fire sparks around phoenix
+    private void drawPhoenixFireSparks(Graphics2D g2d, int phoenixX, int phoenixY, 
+                                     double elapsedTime, double fireEffect) {
+        for (int spark = 0; spark < 12; spark++) {
+            double sparkAngle = (elapsedTime * 3 + spark * Math.PI / 6) % (Math.PI * 2);
+            int sparkX = phoenixX + (int)(Math.cos(sparkAngle) * (50 + fireEffect * 2));
+            int sparkY = phoenixY - 15 + (int)(Math.sin(sparkAngle) * (35 + fireEffect));
+            
+            Color sparkColor;
+            switch (spark % 3) {
+                case 0:
+                    sparkColor = new Color(255, 215, 0, 150);  // Gold
+                    break;
+                case 1:
+                    sparkColor = new Color(255, 80, 0, 130);   // Orange
+                    break;
+                default:
+                    sparkColor = new Color(200, 30, 0, 110);   // Red
+                    break;
+            }
+            
+            g2d.setColor(sparkColor);
+            g2d.fillPolygon(createMidpointCircle(sparkX, sparkY, 3));
+        }
+    }
+    
+    //Draws sky decorations (clouds, stars, sun rays)
+    private void drawSkyDecorations(Graphics2D g2d, double elapsedTime) {
+        drawMovingClouds(g2d, elapsedTime);
+        drawTwinklingStars(g2d, elapsedTime);
+        drawSunRays(g2d, elapsedTime);
+    }
+    
+    //Draws moving clouds with soft overlapping ellipses
+    private void drawMovingClouds(Graphics2D g2d, double elapsedTime) {
+        g2d.setColor(new Color(255, 255, 255, 150));
+        
+        for (int cloudIndex = 0; cloudIndex < 4; cloudIndex++) {
+            int cloudX = (int)((cloudIndex * 150 + elapsedTime * 20) % (WINDOW_WIDTH + 100)) - 50;
+            int cloudY = 80 + cloudIndex * 30;
+            drawSoftCloud(g2d, cloudX, cloudY);
+        }
+    }
+    
+    //Draws individual soft cloud with multiple transparent layers
+    private void drawSoftCloud(Graphics2D g2d, int cloudX, int cloudY) {
+        // Layer 1: Background (most transparent)
+        g2d.setColor(new Color(255, 255, 255, 60));
+        g2d.fillPolygon(createMidpointEllipse(cloudX + 15, cloudY + 8, 40, 22));
+        g2d.fillPolygon(createMidpointEllipse(cloudX + 45, cloudY + 5, 35, 20));
+        g2d.fillPolygon(createMidpointEllipse(cloudX + 75, cloudY + 8, 38, 24));
+        
+        // Layer 2: Middle
+        g2d.setColor(new Color(255, 255, 255, 90));
+        g2d.fillPolygon(createMidpointEllipse(cloudX + 20, cloudY + 12, 35, 18));
+        g2d.fillPolygon(createMidpointEllipse(cloudX + 50, cloudY + 8, 30, 16));
+        g2d.fillPolygon(createMidpointEllipse(cloudX + 80, cloudY + 12, 32, 20));
+        
+        // Layer 3: Dense (less transparent)
+        g2d.setColor(new Color(255, 255, 255, 120));
+        g2d.fillPolygon(createMidpointEllipse(cloudX + 25, cloudY + 15, 28, 15));
+        g2d.fillPolygon(createMidpointEllipse(cloudX + 55, cloudY + 12, 25, 13));
+        g2d.fillPolygon(createMidpointEllipse(cloudX + 85, cloudY + 15, 28, 16));
+        
+        // Layer 4: Highlights (brightest)
+        g2d.setColor(new Color(255, 255, 255, 150));
+        g2d.fillPolygon(createMidpointEllipse(cloudX + 30, cloudY + 18, 22, 12));
+        g2d.fillPolygon(createMidpointEllipse(cloudX + 60, cloudY + 15, 20, 11));
+        
+        // Base layer - connects cloud masses
+        g2d.setColor(new Color(255, 255, 255, 80));
+        g2d.fillPolygon(createMidpointEllipse(cloudX + 45, cloudY + 25, 35, 14));
+    }
+    
+    //Draws twinkling stars
+    private void drawTwinklingStars(Graphics2D g2d, double elapsedTime) {
+        for (int starIndex = 0; starIndex < 8; starIndex++) {
+            double twinkleEffect = Math.sin(elapsedTime * 4 + starIndex) * 0.5 + 0.5;
+            int starX = 50 + starIndex * 70;
+            int starY = 50 + (int)(Math.sin(elapsedTime + starIndex) * 20);
+            
+            g2d.setColor(new Color(255, 255, 200, (int)(twinkleEffect * 180)));
+            drawStar(g2d, starX, starY, 10);
+        }
+    }
+    
+    //Draws individual star shape
+    private void drawStar(Graphics2D g2d, int centerX, int centerY, int starSize) {
+        Polygon starShape = new Polygon();
+        
+        for (int point = 0; point < 10; point++) {
+            double pointAngle = point * Math.PI / 5;
+            int radius = (point % 2 == 0) ? starSize : starSize / 2;
+            int pointX = centerX + (int)(Math.cos(pointAngle) * radius);
+            int pointY = centerY + (int)(Math.sin(pointAngle) * radius);
+            starShape.addPoint(pointX, pointY);
         }
         
-        // แสงแดดกระจาย
-        g2.setColor(new Color(255, 255, 150, 50));
-        for (int i = 0; i < 12; i++) {
-            double angle = (dt * 0.5 + i * Math.PI / 6) % (Math.PI * 2);
-            int rayX = WIDTH/2 + (int)(Math.cos(angle) * 300);
-            int rayY = HEIGHT/4 + (int)(Math.sin(angle) * 200);
-            g2.setStroke(new BasicStroke(2f));
-            g2.drawLine(WIDTH/2, HEIGHT/4, rayX, rayY);
+        g2d.fillPolygon(starShape);
+    }
+    
+    //Draws rotating sun rays using Bresenham lines
+    private void drawSunRays(Graphics2D g2d, double elapsedTime) {
+        g2d.setColor(new Color(255, 255, 150, 50));
+        
+        for (int rayIndex = 0; rayIndex < 12; rayIndex++) {
+            double rayAngle = (elapsedTime * 0.5 + rayIndex * Math.PI / 6) % (Math.PI * 2);
+            int rayEndX = WINDOW_WIDTH / 2 + (int)(Math.cos(rayAngle) * 300);
+            int rayEndY = WINDOW_HEIGHT / 4 + (int)(Math.sin(rayAngle) * 200);
+            
+            drawBresenhamLine(g2d, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 4, rayEndX, rayEndY);
         }
     }
-
-    // เมธอดวาดเมฆ
-    private void drawCloud(Graphics2D g2, int x, int y) {
-        g2.fillOval(x, y, 40, 25);
-        g2.fillOval(x + 15, y - 8, 35, 30);
-        g2.fillOval(x + 30, y, 40, 25);
-        g2.fillOval(x + 20, y + 8, 30, 20);
-    }
-
-    // เมธอดวาดดาว
-    private void drawStar(Graphics2D g2, int x, int y, int size) {
-        int[] xPoints = new int[10];
-        int[] yPoints = new int[10];
-        for (int i = 0; i < 10; i++) {
-            double angle = i * Math.PI / 5;
-            int radius = (i % 2 == 0) ? size : size / 2;
-            xPoints[i] = x + (int)(Math.cos(angle) * radius);
-            yPoints[i] = y + (int)(Math.sin(angle) * radius);
-        }
-        g2.fillPolygon(xPoints, yPoints, 10);
-    }
-
-    // Midpoint circle fill
-    private void drawMidCircle(Graphics2D g2,int cx,int cy,int r,Color col){
-        g2.setColor(col);
-        int x=0,y=r,d=1-r;
-        while(x<=y){
-            fillOct(g2,cx,cy,x,y);
-            if(d<0) d+=2*x+3;
-            else{ d+=2*(x-y)+5; y--; }
-            x++;
-        }
-    }
-    private void fillOct(Graphics2D g2,int cx,int cy,int x,int y){
-        g2.drawLine(cx-x,cy-y,cx+x,cy-y);
-        g2.drawLine(cx-x,cy+y,cx+x,cy+y);
-        g2.drawLine(cx-y,cy-x,cx+y,cy-x);
-        g2.drawLine(cx-y,cy+x,cx+y,cy+x);
-    }
-
-    // Midpoint circle outline
-    private void drawMidCircleOutline(Graphics2D g2,int cx,int cy,int r){
-        g2.setColor(Color.WHITE);
-        int x=0,y=r,d=1-r;
-        while(x<=y){
-            plotPts(g2,cx,cy,x,y);
-            if(d<0) d+=2*x+3;
-            else { d+=2*(x-y)+5; y--; }
-            x++;
-        }
-    }
-    private void plotPts(Graphics2D g2,int cx,int cy,int x,int y){
-        g2.drawLine(cx+x,cy+y,cx+x,cy+y);
-        g2.drawLine(cx-x,cy+y,cx-x,cy+y);
-        g2.drawLine(cx+x,cy-y,cx+x,cy-y);
-        g2.drawLine(cx-x,cy-y,cx-x,cy-y);
-        g2.drawLine(cx+y,cy+x,cx+y,cy+x);
-        g2.drawLine(cx-y,cy+x,cx-y,cy+x);
-        g2.drawLine(cx+y,cy-x,cx+y,cy-x);
-        g2.drawLine(cx-y,cy-x,cx-y,cy-x);
-    }
-
+    
+    // ======= Event Handling =======
     @Override
-    public void actionPerformed(ActionEvent e) {
+    public void actionPerformed(ActionEvent event) {
         repaint();
     }
-
-    public static void main(String[] args) {
-        JFrame frame = new JFrame("WHAT IF I REBORNED");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.add(new Phoenix());
-        frame.pack();
-        frame.setLocationRelativeTo(null);
-        frame.setVisible(true);
+    
+    // ======= Main Method =======
+    public static void main(String[] arguments) {
+        JFrame mainWindow = new JFrame("WHAT IF I REBORNED");
+        mainWindow.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        mainWindow.add(new Phoenix1());
+        mainWindow.pack();
+        mainWindow.setLocationRelativeTo(null);
+        mainWindow.setVisible(true);
     }
 }
